@@ -1,0 +1,14 @@
+{
+  "annotations":{"list":[]},"editable":true,"graphTooltip":1,"id":null,"links":[],
+  "panels":[
+    {"type":"stat","title":"Prometheus Targets Up","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(up)","refId":"A"}],"gridPos":{"h":5,"w":6,"x":0,"y":0}},
+    {"type":"stat","title":"Accepted Spans / sec","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(rate(otelcol_receiver_accepted_spans_total[5m]))","refId":"A"}],"gridPos":{"h":5,"w":6,"x":6,"y":0}},
+    {"type":"stat","title":"Accepted Metrics / sec","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(rate(otelcol_receiver_accepted_metric_points_total[5m]))","refId":"A"}],"gridPos":{"h":5,"w":6,"x":12,"y":0}},
+    {"type":"stat","title":"Accepted Logs / sec","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum(rate(otelcol_receiver_accepted_log_records_total[5m]))","refId":"A"}],"gridPos":{"h":5,"w":6,"x":18,"y":0}},
+    {"type":"timeseries","title":"Host CPU %","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"100 - avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100","legendFormat":"{{instance}}","refId":"A"}],"fieldConfig":{"defaults":{"unit":"percent","min":0,"max":100}},"gridPos":{"h":8,"w":12,"x":0,"y":5}},
+    {"type":"timeseries","title":"Container Memory","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by(name) (container_memory_working_set_bytes{name!=\"\"})","legendFormat":"{{name}}","refId":"A"}],"fieldConfig":{"defaults":{"unit":"bytes"}},"gridPos":{"h":8,"w":12,"x":12,"y":5}},
+    {"type":"timeseries","title":"OTel Export Failures","datasource":{"type":"prometheus","uid":"prometheus"},"targets":[{"expr":"sum by(exporter) (rate(otelcol_exporter_send_failed_spans_total[5m]))","legendFormat":"spans {{exporter}}","refId":"A"},{"expr":"sum by(exporter) (rate(otelcol_exporter_send_failed_metric_points_total[5m]))","legendFormat":"metrics {{exporter}}","refId":"B"},{"expr":"sum by(exporter) (rate(otelcol_exporter_send_failed_log_records_total[5m]))","legendFormat":"logs {{exporter}}","refId":"C"}],"gridPos":{"h":8,"w":24,"x":0,"y":13}}
+  ],
+  "refresh":"30s","schemaVersion":39,"tags":["otel","platform"],"templating":{"list":[]},"time":{"from":"now-6h","to":"now"},"timezone":"browser","title":"Platform Overview","uid":"otel-platform-overview","version":1
+}
+

@@ -1,0 +1,44 @@
+groups:
+  - name: platform-health
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+      - alert: OTelCollectorExportFailure
+        expr: rate(otelcol_exporter_send_failed_spans_total[5m]) + rate(otelcol_exporter_send_failed_metric_points_total[5m]) + rate(otelcol_exporter_send_failed_log_records_total[5m]) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "OTel Collector is dropping telemetry"
+      - alert: HostHighCPU
+        expr: 100 - avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100 > 85
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Host CPU usage is above 85%"
+      - alert: HostLowDisk
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} < 0.15
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "Host filesystem has less than 15% free space"
+  - name: cicd-slo
+    rules:
+      - alert: CICDPipelineFailureRateHigh
+        expr: sum(rate(cicd_pipeline_runs_total{status="failed"}[15m])) / clamp_min(sum(rate(cicd_pipeline_runs_total[15m])), 0.001) > 0.2
+        for: 15m
+        labels: {severity: warning, domain: cicd}
+        annotations:
+          summary: "CICD pipeline failure rate exceeds 20%"
+  - name: media-slo
+    rules:
+      - alert: MediaProcessingFailureRateHigh
+        expr: sum(rate(media_jobs_total{status="failed"}[15m])) / clamp_min(sum(rate(media_jobs_total[15m])), 0.001) > 0.05
+        for: 15m
+        labels: {severity: warning, domain: media}
+        annotations:
+          summary: "Media processing failure rate exceeds 5%"
+
