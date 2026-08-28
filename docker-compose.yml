@@ -77,8 +77,8 @@ services:
       - ./config/logstash/pipeline.conf:/usr/share/logstash/pipeline/logstash.conf:ro
     ports:
       - "5044:5044"
-      - "5000:5000/tcp"
-      - "5000:5000/udp"
+      - "${LOGSTASH_TCP_PORT:-15000}:5000/tcp"
+      - "${LOGSTASH_TCP_PORT:-15000}:5000/udp"
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -119,7 +119,7 @@ services:
     image: prom/node-exporter:v1.9.0
     command: ["--path.rootfs=/host"]
     volumes:
-      - /:/host:ro,rslave
+      - /:/host:ro
     restart: unless-stopped
     networks: [observability]
 
@@ -145,4 +145,3 @@ volumes:
 networks:
   observability:
     driver: bridge
-

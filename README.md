@@ -53,7 +53,7 @@ Grafana 登录账号来自 `.env`。Dashboard 会自动加载到 `OpenTelemetry`
 
 - Trace：OTLP → Collector → Tempo，本地默认保留 7 天；Tempo 自动生成 span metrics 和 service graph，并 remote-write 到 Prometheus。
 - Metrics：OTLP → Collector Prometheus exporter → Prometheus，默认保留 30 天；同时采集节点、容器和平台自身指标。
-- Logs：OTLP → Collector → Elasticsearch 的 `otel-logs*` 索引；传统 JSON 日志可经 TCP/UDP `5000` 或 Beats `5044` 进入 `app-logs-*`。
+- Logs：OTLP → Collector → Elasticsearch 的 `otel-logs*` 索引；传统 JSON 日志可经 TCP/UDP `15000`（可由 `LOGSTASH_TCP_PORT` 修改）或 Beats `5044` 进入 `app-logs-*`。
 - Grafana 数据源和 trace-to-metrics、trace-to-logs 跳转均自动 provision。
 
 ## 新项目接入
@@ -99,4 +99,3 @@ scripts/                               配置校验和冒烟测试
 ## 安全说明
 
 为了开箱即用，本地 Compose 中 Elasticsearch 安全认证默认关闭，OTLP 入口也未启用 TLS。这些默认值不能直接用于公网或生产环境；生产要求见清单。
-
