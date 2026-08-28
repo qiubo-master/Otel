@@ -1,0 +1,110 @@
+name: ForgeOps Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Deployment action
+        required: true
+        default: deploy
+        type: choice
+        options: [deploy, rollback]
+      resource_profile:
+        description: Resource profile
+        required: false
+        default: large
+      app_cpu:
+        description: CPU limit
+        required: false
+        default: "4.0"
+      app_memory:
+        description: Memory limit
+        required: false
+        default: "8g"
+      database_memory:
+        description: Elasticsearch memory
+        required: false
+        default: "2g"
+      host_port:
+        description: Grafana host port
+        required: false
+        default: "3000"
+      bind_address:
+        description: Bind address
+        required: false
+        default: "0.0.0.0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forgeops-otel-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate platform configuration
+        run: ./scripts/validate.sh
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          tar --exclude=.git --exclude=.env -czf /tmp/otel-release.tgz .
+          scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/otel-release.tgz "$USER@$HOST:/tmp/otel-${GITHUB_SHA}.tgz"
+
+      - name: Activate or rollback
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          ACTION: ${{ inputs.action }}
+          RELEASE_SHA: ${{ github.sha }}
+          GRAFANA_PORT: ${{ inputs.host_port }}
+          BIND_ADDRESS: ${{ inputs.bind_address }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "ACTION='$ACTION' RELEASE_SHA='$RELEASE_SHA' GRAFANA_PORT='$GRAFANA_PORT' BIND_ADDRESS='$BIND_ADDRESS' bash -s" <<'REMOTE'
+          set -euo pipefail
+          root=/opt/forgeops/Otel
+          releases="$root/releases"
+          mkdir -p "$releases" "$root/shared"
+
+          if [ "$ACTION" = rollback ]; then
+            previous=$(find "$releases" -mindepth 1 -maxdepth 1 -type d ! -path "$(readlink -f "$root/current" 2>/dev/null || true)" -print | sort -r | head -n 1)
+            test -n "$previous"
+            ln -sfn "$previous" "$root/current"
+            cd "$root/current"
+            docker compose up -d
+            exit 0
+          fi
+
+          release="$releases/$RELEASE_SHA"
+          mkdir -p "$release"
+          tar -xzf "/tmp/otel-$RELEASE_SHA.tgz" -C "$release"
+          cd "$release"
+          if [ ! -f "$root/shared/.env" ]; then cp .env.example "$root/shared/.env"; fi
+          ln -sfn "$root/shared/.env" .env
+          export GRAFANA_PORT BIND_ADDRESS
+          docker compose pull
+          docker compose up -d --remove-orphans
+          curl --fail --retry 30 --retry-delay 5 http://localhost:13133/
+          ln -sfn "$release" "$root/current"
+          REMOTE

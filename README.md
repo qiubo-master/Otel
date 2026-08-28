@@ -2,6 +2,8 @@
 
 一套面向全项目的本地/单机可部署观测栈，统一接收 OpenTelemetry trace、metrics、logs，同时提供 Prometheus 指标库、ELK 日志聚合和 Grafana 看板。已预置平台健康、CICD 中台与 Media 三类视图。
 
+[平台操作手册](docs/OPERATIONS.md) · [新项目接入指南](docs/ONBOARDING.md) · [生产化清单](docs/PRODUCTION.md)
+
 ## 架构
 
 ```text
