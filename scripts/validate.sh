@@ -13,6 +13,7 @@ config/tempo.yaml
 config/grafana/provisioning/datasources/datasources.yml
 config/grafana/provisioning/dashboards/dashboards.yml
 config/grafana/dashboards/platform-overview.json
+config/grafana/dashboards/service-observability.json
 config/grafana/dashboards/cicd-overview.json
 config/grafana/dashboards/media-overview.json
 "
@@ -26,4 +27,3 @@ for dashboard in config/grafana/dashboards/*.json; do
 done
 
 echo "Static validation passed."
-
