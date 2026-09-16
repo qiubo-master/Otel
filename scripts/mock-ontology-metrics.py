@@ -2,8 +2,13 @@
 """Small dependency-free Prometheus endpoint for the Ontology demo dashboard."""
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
 import math
+import random
+import secrets
+import threading
 import time
+from urllib.request import Request, urlopen
 
 STARTED_AT = time.time()
 
@@ -52,6 +57,27 @@ def metric_payload() -> str:
         f'ontology_decisions_total{{service_name="ontology",result="matched"}} {int(decision_total * 0.83)}',
         f'ontology_decisions_total{{service_name="ontology",result="fallback"}} {int(decision_total * 0.14)}',
         f'ontology_decisions_total{{service_name="ontology",result="rejected"}} {int(decision_total * 0.03)}',
+        '# HELP ontology_answer_accuracy_ratio Human-evaluated answer accuracy.',
+        '# TYPE ontology_answer_accuracy_ratio gauge',
+        f'ontology_answer_accuracy_ratio{{service_name="ontology",dataset="golden-set"}} {0.925 + 0.012 * math.sin(elapsed / 90):.4f}',
+        '# HELP ontology_recall_ratio Entity and rule retrieval recall.',
+        '# TYPE ontology_recall_ratio gauge',
+        f'ontology_recall_ratio{{service_name="ontology",dataset="golden-set"}} {0.887 + 0.018 * math.sin(elapsed / 75):.4f}',
+        '# HELP ontology_groundedness_ratio Answers supported by retrieved evidence.',
+        '# TYPE ontology_groundedness_ratio gauge',
+        f'ontology_groundedness_ratio{{service_name="ontology"}} {0.944 + 0.009 * math.sin(elapsed / 110):.4f}',
+        '# HELP ontology_hallucination_ratio Unsupported answer ratio.',
+        '# TYPE ontology_hallucination_ratio gauge',
+        f'ontology_hallucination_ratio{{service_name="ontology"}} {0.026 + 0.006 * (1 + math.sin(elapsed / 80)):.4f}',
+        '# HELP ontology_safety_events_total Detected and blocked safety events.',
+        '# TYPE ontology_safety_events_total counter',
+        f'ontology_safety_events_total{{service_name="ontology",category="prompt_injection",severity="high"}} {int(18 + elapsed / 95)}',
+        f'ontology_safety_events_total{{service_name="ontology",category="pii_exposure",severity="critical"}} {int(4 + elapsed / 330)}',
+        f'ontology_safety_events_total{{service_name="ontology",category="unsafe_advice",severity="medium"}} {int(29 + elapsed / 75)}',
+        f'ontology_safety_events_total{{service_name="ontology",category="policy_bypass",severity="high"}} {int(12 + elapsed / 140)}',
+        '# HELP ontology_guardrail_block_ratio Fraction of requests blocked by guardrails.',
+        '# TYPE ontology_guardrail_block_ratio gauge',
+        f'ontology_guardrail_block_ratio{{service_name="ontology"}} {0.006 + 0.002 * (1 + math.sin(elapsed / 55)):.4f}',
         '# HELP ontology_cache_hit_ratio Cache hit ratio from zero to one.',
         '# TYPE ontology_cache_hit_ratio gauge',
         f'ontology_cache_hit_ratio{{service_name="ontology"}} {0.91 + 0.025 * math.sin(elapsed / 70):.4f}',
@@ -67,6 +93,58 @@ def metric_payload() -> str:
         'ontology_dependency_up{service_name="ontology",dependency="gfm"} 1',
     ])
     return "\n".join(lines) + "\n"
+
+
+def post_otlp(path: str, payload: dict) -> None:
+    request = Request(
+        f"http://otel-collector:4318/v1/{path}",
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=3):
+        pass
+
+
+def emit_telemetry() -> None:
+    routes = ["POST /api/search", "GET /api/entities", "POST /api/decision"]
+    while True:
+        started = time.time_ns()
+        duration_ms = random.choice([42, 58, 74, 96, 130, 210, 380])
+        trace_id = secrets.token_hex(16)
+        span_id = secrets.token_hex(8)
+        route = random.choice(routes)
+        unsafe = random.random() < 0.08
+        status_code = 2 if unsafe else 1
+        attributes = [
+            {"key": "http.route", "value": {"stringValue": route.split(" ", 1)[1]}},
+            {"key": "http.request.method", "value": {"stringValue": route.split(" ", 1)[0]}},
+            {"key": "ontology.intent", "value": {"stringValue": random.choice(["part_search", "fault_diagnosis", "service_recommendation"])}},
+            {"key": "ontology.grounded", "value": {"boolValue": not unsafe}},
+        ]
+        resource = {"attributes": [
+            {"key": "service.name", "value": {"stringValue": "ontology"}},
+            {"key": "service.namespace", "value": {"stringValue": "automotive"}},
+            {"key": "deployment.environment.name", "value": {"stringValue": "demo"}},
+        ]}
+        trace = {"resourceSpans": [{"resource": resource, "scopeSpans": [{"scope": {"name": "ontology.demo"}, "spans": [{
+            "traceId": trace_id, "spanId": span_id, "name": route, "kind": 2,
+            "startTimeUnixNano": str(started), "endTimeUnixNano": str(started + duration_ms * 1_000_000),
+            "attributes": attributes, "status": {"code": status_code, "message": "guardrail blocked request" if unsafe else ""},
+        }]}]}]}
+        message = "Guardrail blocked possible prompt injection" if unsafe else f"Ontology request completed in {duration_ms}ms"
+        logs = {"resourceLogs": [{"resource": resource, "scopeLogs": [{"scope": {"name": "ontology.demo"}, "logRecords": [{
+            "timeUnixNano": str(started + duration_ms * 1_000_000), "severityNumber": 17 if unsafe else 9,
+            "severityText": "ERROR" if unsafe else "INFO", "body": {"stringValue": message},
+            "traceId": trace_id, "spanId": span_id,
+            "attributes": [{"key": "event.domain", "value": {"stringValue": "ontology"}}, {"key": "demo.data", "value": {"boolValue": True}}],
+        }]}]}]}
+        try:
+            post_otlp("traces", trace)
+            post_otlp("logs", logs)
+        except Exception:
+            pass
+        time.sleep(3)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -85,4 +163,5 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 
+threading.Thread(target=emit_telemetry, daemon=True).start()
 HTTPServer(("0.0.0.0", 9465), Handler).serve_forever()

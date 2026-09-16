@@ -43,6 +43,7 @@ services:
     command: ["python", "/app/mock-ontology-metrics.py"]
     volumes:
       - ./scripts/mock-ontology-metrics.py:/app/mock-ontology-metrics.py:ro
+    depends_on: [otel-collector]
     restart: unless-stopped
     networks: [observability]
 
