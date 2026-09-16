@@ -14,6 +14,7 @@ config/grafana/provisioning/datasources/datasources.yml
 config/grafana/provisioning/dashboards/dashboards.yml
 config/grafana/dashboards/platform-overview.json
 config/grafana/dashboards/service-observability.json
+config/grafana/dashboards/ontology-overview.json
 config/grafana/dashboards/cicd-overview.json
 config/grafana/dashboards/media-overview.json
 "

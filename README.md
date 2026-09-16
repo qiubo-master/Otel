@@ -92,7 +92,7 @@ config/prometheus/                     抓取配置与告警规则
 config/tempo.yaml                      Trace 存储与指标生成
 config/logstash/pipeline.conf          传统日志管道
 config/grafana/provisioning/           自动数据源与 Dashboard 装载
-config/grafana/dashboards/             Platform / Service / CICD / Media 看板
+config/grafana/dashboards/             Platform / Service / Ontology / CICD / Media 看板
 docs/ONBOARDING.md                     新项目接入规范
 docs/PRODUCTION.md                     生产化安全与扩展建议
 scripts/                               配置校验和冒烟测试

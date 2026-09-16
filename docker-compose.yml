@@ -38,6 +38,14 @@ services:
     restart: unless-stopped
     networks: [observability]
 
+  ontology-mock:
+    image: python:3.12-alpine
+    command: ["python", "/app/mock-ontology-metrics.py"]
+    volumes:
+      - ./scripts/mock-ontology-metrics.py:/app/mock-ontology-metrics.py:ro
+    restart: unless-stopped
+    networks: [observability]
+
   tempo:
     image: grafana/tempo:${TEMPO_VERSION:-2.7.2}
     command: ["-config.file=/etc/tempo.yaml"]

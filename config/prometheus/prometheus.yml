@@ -23,3 +23,7 @@ scrape_configs:
   - job_name: containers
     static_configs:
       - targets: ["cadvisor:8080"]
+  - job_name: ontology
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["ontology-mock:9465"]
